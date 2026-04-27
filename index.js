@@ -3,7 +3,7 @@ const {
   Client, GatewayIntentBits, Partials, EmbedBuilder,
   PermissionFlagsBits, SlashCommandBuilder, REST, Routes, Events
 } = require('discord.js');
-const Anthropic = require('@anthropic-ai/sdk');
+const Groq = require('groq-sdk');
 
 // ─── Clients ────────────────────────────────────────────────────────────────
 const client = new Client({
@@ -16,7 +16,7 @@ const client = new Client({
   partials: [Partials.Channel],
 });
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ─── In-memory stores ────────────────────────────────────────────────────────
 const welcomeChannels   = new Map(); // guildId  → channelId
@@ -163,18 +163,23 @@ client.on(Events.MessageCreate, async (message) => {
   if (history.length > 20) history.splice(0, 2); // drop oldest pair
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const response = await groq.chat.completions.create({
+      model: 'llama3-70b-8192',
       max_tokens: 600,
-      system:
-        'You are a friendly, helpful Discord bot assistant named Clyde. ' +
-        'Keep responses concise (under 400 words) and suitable for Discord chat. ' +
-        'Use Discord markdown (bold, italic, code blocks) when helpful. ' +
-        'Be engaging and slightly casual.',
-      messages: history,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a friendly, helpful Discord bot assistant named Clyde. ' +
+            'Keep responses concise (under 400 words) and suitable for Discord chat. ' +
+            'Use Discord markdown (bold, italic, code blocks) when helpful. ' +
+            'Be engaging and slightly casual.',
+        },
+        ...history,
+      ],
     });
 
-    const reply = response.content[0].text;
+    const reply = response.choices[0].message.content;
     history.push({ role: 'assistant', content: reply });
 
     // Split messages longer than 2000 chars
@@ -344,15 +349,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await interaction.deferReply();
 
     try {
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+      const response = await groq.chat.completions.create({
+        model: 'llama3-70b-8192',
         max_tokens: 600,
-        system:
-          'You are a helpful Discord bot assistant. Keep answers concise and use Discord markdown formatting when helpful.',
-        messages: [{ role: 'user', content: question }],
+        messages: [
+          { role: 'system', content: 'You are a helpful Discord bot assistant. Keep answers concise and use Discord markdown formatting when helpful.' },
+          { role: 'user', content: question },
+        ],
       });
 
-      const answer = response.content[0].text;
+      const answer = response.choices[0].message.content;
       await interaction.editReply(answer.length > 2000 ? answer.slice(0, 1997) + '...' : answer);
     } catch (err) {
       console.error('AI /ask error:', err);
