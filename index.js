@@ -1,6 +1,5 @@
 require('dotenv').config();
 
-// ─── Keep-alive web server (required for Render) ─────────────────────────────
 const http = require('http');
 http.createServer((req, res) => res.end('Bot is alive!')).listen(process.env.PORT || 3000, () => {
   console.log(`🌐 Web server running on port ${process.env.PORT || 3000}`);
@@ -12,7 +11,6 @@ const {
 } = require('discord.js');
 const Groq = require('groq-sdk');
 
-// ─── Clients ────────────────────────────────────────────────────────────────
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -25,13 +23,10 @@ const client = new Client({
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// ─── In-memory stores ────────────────────────────────────────────────────────
-const welcomeChannels   = new Map(); // guildId  → channelId
-const conversationHistory = new Map(); // channelId → messages[]
+const welcomeChannels = new Map();
+const conversationHistory = new Map();
 
-// ─── Slash command definitions ───────────────────────────────────────────────
 const commands = [
-  // Moderation
   new SlashCommandBuilder()
     .setName('kick')
     .setDescription('Kick a member from the server')
@@ -79,7 +74,6 @@ const commands = [
     .addIntegerOption(o => o.setName('amount').setDescription('Number of messages (1-100)').setRequired(true).setMinValue(1).setMaxValue(100))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
-  // Welcome
   new SlashCommandBuilder()
     .setName('setwelcome')
     .setDescription('Set the channel for welcome messages')
@@ -91,7 +85,6 @@ const commands = [
     .setDescription('Preview the welcome message')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
-  // AI
   new SlashCommandBuilder()
     .setName('ask')
     .setDescription('Ask the AI a one-off question')
@@ -103,7 +96,6 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 ];
 
-// ─── Register slash commands ─────────────────────────────────────────────────
 async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
   try {
@@ -117,23 +109,18 @@ async function registerCommands() {
   }
 }
 
-// ─── Bot ready ───────────────────────────────────────────────────────────────
 client.once(Events.ClientReady, async () => {
   console.log(`🤖 Logged in as ${client.user.tag}`);
-  client.user.setActivity('your server 👀', { type: 3 }); // WATCHING
+  client.user.setActivity('your server 👀', { type: 3 });
   await registerCommands();
 });
 
-// ─── Welcome new members ─────────────────────────────────────────────────────
 client.on(Events.GuildMemberAdd, async (member) => {
   const channelId = welcomeChannels.get(member.guild.id);
   if (!channelId) return;
-
   const channel = member.guild.channels.cache.get(channelId);
   if (!channel) return;
-
-  const embed = buildWelcomeEmbed(member);
-  await channel.send({ embeds: [embed] });
+  await channel.send({ embeds: [buildWelcomeEmbed(member)] });
 });
 
 function buildWelcomeEmbed(member) {
@@ -149,7 +136,6 @@ function buildWelcomeEmbed(member) {
     .setTimestamp();
 }
 
-// ─── AI auto-responder (mention the bot to chat) ─────────────────────────────
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
   if (!message.mentions.has(client.user)) return;
@@ -161,13 +147,12 @@ client.on(Events.MessageCreate, async (message) => {
 
   await message.channel.sendTyping();
 
-  // Maintain per-channel conversation history (last 20 messages)
   const cid = message.channel.id;
   if (!conversationHistory.has(cid)) conversationHistory.set(cid, []);
   const history = conversationHistory.get(cid);
 
   history.push({ role: 'user', content: `${message.author.username}: ${userMessage}` });
-  if (history.length > 20) history.splice(0, 2); // drop oldest pair
+  if (history.length > 20) history.splice(0, 2);
 
   try {
     const response = await groq.chat.completions.create({
@@ -189,7 +174,6 @@ client.on(Events.MessageCreate, async (message) => {
     const reply = response.choices[0].message.content;
     history.push({ role: 'assistant', content: reply });
 
-    // Split messages longer than 2000 chars
     if (reply.length > 2000) {
       const chunks = reply.match(/[\s\S]{1,2000}/g);
       for (const chunk of chunks) await message.reply(chunk);
@@ -202,19 +186,15 @@ client.on(Events.MessageCreate, async (message) => {
   }
 });
 
-// ─── Slash command handler ───────────────────────────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName } = interaction;
 
-  // ── /kick ──────────────────────────────────────────────────────────────────
   if (commandName === 'kick') {
     const target = interaction.options.getMember('user');
     const reason = interaction.options.getString('reason') ?? 'No reason provided';
-
     if (!target) return interaction.reply({ content: '❌ User not found.', ephemeral: true });
     if (!target.kickable) return interaction.reply({ content: '❌ I don\'t have permission to kick this user.', ephemeral: true });
-
     await target.kick(reason);
     await interaction.reply({ embeds: [
       new EmbedBuilder().setColor(0xFF6B35).setTitle('👢 Member Kicked')
@@ -226,14 +206,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
     ]});
   }
 
-  // ── /ban ───────────────────────────────────────────────────────────────────
   else if (commandName === 'ban') {
     const target = interaction.options.getMember('user');
     const reason = interaction.options.getString('reason') ?? 'No reason provided';
-
     if (!target) return interaction.reply({ content: '❌ User not found.', ephemeral: true });
     if (!target.bannable) return interaction.reply({ content: '❌ I don\'t have permission to ban this user.', ephemeral: true });
-
     await target.ban({ reason, deleteMessageSeconds: 86400 });
     await interaction.reply({ embeds: [
       new EmbedBuilder().setColor(0xFF0000).setTitle('🔨 Member Banned')
@@ -245,7 +222,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     ]});
   }
 
-  // ── /unban ─────────────────────────────────────────────────────────────────
   else if (commandName === 'unban') {
     const userId = interaction.options.getString('userid');
     try {
@@ -260,15 +236,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
-  // ── /mute ──────────────────────────────────────────────────────────────────
   else if (commandName === 'mute') {
     const target = interaction.options.getMember('user');
     const minutes = interaction.options.getInteger('minutes');
-    const reason  = interaction.options.getString('reason') ?? 'No reason provided';
-
+    const reason = interaction.options.getString('reason') ?? 'No reason provided';
     if (!target) return interaction.reply({ content: '❌ User not found.', ephemeral: true });
     if (!target.moderatable) return interaction.reply({ content: '❌ I can\'t timeout this user.', ephemeral: true });
-
     await target.timeout(minutes * 60 * 1000, reason);
     await interaction.reply({ embeds: [
       new EmbedBuilder().setColor(0xFFA500).setTitle('🔇 Member Muted (Timeout)')
@@ -280,11 +253,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     ]});
   }
 
-  // ── /unmute ────────────────────────────────────────────────────────────────
   else if (commandName === 'unmute') {
     const target = interaction.options.getMember('user');
     if (!target) return interaction.reply({ content: '❌ User not found.', ephemeral: true });
-
     await target.timeout(null);
     await interaction.reply({ embeds: [
       new EmbedBuilder().setColor(0x00E676).setTitle('🔊 Member Unmuted')
@@ -293,21 +264,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
     ]});
   }
 
-  // ── /warn ──────────────────────────────────────────────────────────────────
   else if (commandName === 'warn') {
     const target = interaction.options.getMember('user');
     const reason = interaction.options.getString('reason');
     if (!target) return interaction.reply({ content: '❌ User not found.', ephemeral: true });
-
-    // Try to DM the user
     try {
       await target.send(
         `⚠️ **You have been warned** in **${interaction.guild.name}**.\n` +
         `**Reason:** ${reason}\n\n` +
         `Please follow the server rules to avoid further action.`
       );
-    } catch { /* User has DMs disabled */ }
-
+    } catch {}
     await interaction.reply({ embeds: [
       new EmbedBuilder().setColor(0xFFD700).setTitle('⚠️ Member Warned')
         .addFields(
@@ -319,42 +286,34 @@ client.on(Events.InteractionCreate, async (interaction) => {
     ]});
   }
 
-  // ── /purge ─────────────────────────────────────────────────────────────────
   else if (commandName === 'purge') {
     const amount = interaction.options.getInteger('amount');
     try {
       const deleted = await interaction.channel.bulkDelete(amount, true);
       await interaction.reply({ content: `🗑️ Deleted **${deleted.size}** message(s).`, ephemeral: true });
-    } catch (err) {
+    } catch {
       await interaction.reply({ content: '❌ Failed to delete messages. Messages older than 14 days cannot be bulk deleted.', ephemeral: true });
     }
   }
 
-  // ── /setwelcome ────────────────────────────────────────────────────────────
   else if (commandName === 'setwelcome') {
     const channel = interaction.options.getChannel('channel');
     welcomeChannels.set(interaction.guild.id, channel.id);
     await interaction.reply({ content: `✅ Welcome messages will now be sent in ${channel}!`, ephemeral: true });
   }
 
-  // ── /testwelcome ───────────────────────────────────────────────────────────
   else if (commandName === 'testwelcome') {
     const channelId = welcomeChannels.get(interaction.guild.id);
     if (!channelId) return interaction.reply({ content: '❌ No welcome channel set. Use `/setwelcome` first.', ephemeral: true });
-
     const channel = interaction.guild.channels.cache.get(channelId);
     if (!channel) return interaction.reply({ content: '❌ Saved welcome channel no longer exists.', ephemeral: true });
-
-    const embed = buildWelcomeEmbed(interaction.member);
-    await channel.send({ embeds: [embed] });
+    await channel.send({ embeds: [buildWelcomeEmbed(interaction.member)] });
     await interaction.reply({ content: `✅ Test welcome sent to ${channel}!`, ephemeral: true });
   }
 
-  // ── /ask ───────────────────────────────────────────────────────────────────
   else if (commandName === 'ask') {
     const question = interaction.options.getString('question');
     await interaction.deferReply();
-
     try {
       const response = await groq.chat.completions.create({
         model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
@@ -364,7 +323,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           { role: 'user', content: question },
         ],
       });
-
       const answer = response.choices[0].message.content;
       await interaction.editReply(answer.length > 2000 ? answer.slice(0, 1997) + '...' : answer);
     } catch (err) {
@@ -373,16 +331,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
-  // ── /clearchat ─────────────────────────────────────────────────────────────
   else if (commandName === 'clearchat') {
     conversationHistory.delete(interaction.channel.id);
     await interaction.reply({ content: '🧹 AI conversation history for this channel has been cleared!', ephemeral: true });
   }
 });
 
-// ─── Error handling ──────────────────────────────────────────────────────────
 client.on('error', console.error);
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 
-// ─── Login ───────────────────────────────────────────────────────────────────
 client.login(process.env.DISCORD_TOKEN);
