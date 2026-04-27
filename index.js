@@ -162,10 +162,10 @@ client.on(Events.MessageCreate, async (message) => {
         {
           role: 'system',
           content:
-            'You are a friendly, helpful Discord bot assistant named Clyde. ' +
-            'Keep responses concise (under 400 words) and suitable for Discord chat. ' +
-            'Use Discord markdown (bold, italic, code blocks) when helpful. ' +
-            'Be engaging and slightly casual.',
+            'You are a chill Discord bot. Talk like a normal person — casual and short. ' +
+            'NEVER open with bullet point menus, lists of options, or greetings like "How can I help you today?". ' +
+            'Just answer the question directly. Keep it under 200 words unless asked for more. ' +
+            'Use Discord markdown only when it actually helps.',
         },
         ...history,
       ],
@@ -319,7 +319,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         model: 'openai/gpt-oss-120b',
         max_tokens: 600,
         messages: [
-          { role: 'system', content: 'You are a helpful Discord bot assistant. Keep answers concise and use Discord markdown formatting when helpful.' },
+          { role: 'system', content: 'You are a chill Discord bot. Answer directly and concisely — no greetings, no bullet point menus, no fluff. Use Discord markdown only when helpful.' },
           { role: 'user', content: question },
         ],
       });
