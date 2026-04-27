@@ -171,7 +171,7 @@ client.on(Events.MessageCreate, async (message) => {
 
   try {
     const response = await groq.chat.completions.create({
-      model: 'llama3-70b-8192',
+      model: 'llama-3.3-70b-versatile',
       max_tokens: 600,
       messages: [
         {
@@ -357,7 +357,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     try {
       const response = await groq.chat.completions.create({
-        model: 'llama3-70b-8192',
+        model: 'llama-3.3-70b-versatile',
         max_tokens: 600,
         messages: [
           { role: 'system', content: 'You are a helpful Discord bot assistant. Keep answers concise and use Discord markdown formatting when helpful.' },
