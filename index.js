@@ -1,4 +1,11 @@
 require('dotenv').config();
+
+// ─── Keep-alive web server (required for Render) ─────────────────────────────
+const http = require('http');
+http.createServer((req, res) => res.end('Bot is alive!')).listen(process.env.PORT || 3000, () => {
+  console.log(`🌐 Web server running on port ${process.env.PORT || 3000}`);
+});
+
 const {
   Client, GatewayIntentBits, Partials, EmbedBuilder,
   PermissionFlagsBits, SlashCommandBuilder, REST, Routes, Events
